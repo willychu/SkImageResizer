@@ -52,16 +52,16 @@ namespace SkImageResizer
             {
                 Directory.CreateDirectory(destPath);
             }
-            
-            await Task.Yield();
 
             var taskList = new List<Task>();
 
             var allFiles = FindImages(sourcePath);
             foreach (var filePath in allFiles)
             {
-                taskList.Add(Task.Run(() =>
+                taskList.Add(Task.Run(async () =>
                 {
+                    await Task.Yield();
+
                     var bitmap = SKBitmap.Decode(filePath);
                     var imgPhoto = SKImage.FromBitmap(bitmap);
                     var imgName = Path.GetFileNameWithoutExtension(filePath);
