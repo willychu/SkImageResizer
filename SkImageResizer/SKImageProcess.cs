@@ -2,7 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using SkiaSharp;
@@ -53,32 +52,37 @@ namespace SkImageResizer
             {
                 Directory.CreateDirectory(destPath);
             }
-
+            
             await Task.Yield();
 
+            var taskList = new List<Task>();
+
             var allFiles = FindImages(sourcePath);
-            var tasks = allFiles.Select(filePath => Task.Run(() =>
+            foreach (var filePath in allFiles)
             {
-                var bitmap = SKBitmap.Decode(filePath);
-                var imgPhoto = SKImage.FromBitmap(bitmap);
-                var imgName = Path.GetFileNameWithoutExtension(filePath);
+                taskList.Add(Task.Run(() =>
+                {
+                    var bitmap = SKBitmap.Decode(filePath);
+                    var imgPhoto = SKImage.FromBitmap(bitmap);
+                    var imgName = Path.GetFileNameWithoutExtension(filePath);
 
-                var sourceWidth = imgPhoto.Width;
-                var sourceHeight = imgPhoto.Height;
+                    var sourceWidth = imgPhoto.Width;
+                    var sourceHeight = imgPhoto.Height;
 
-                var destinationWidth = (int) (sourceWidth * scale);
-                var destinationHeight = (int) (sourceHeight * scale);
+                    var destinationWidth = (int) (sourceWidth * scale);
+                    var destinationHeight = (int) (sourceHeight * scale);
 
-                using var scaledBitmap = bitmap.Resize(
-                    new SKImageInfo(destinationWidth, destinationHeight),
-                    SKFilterQuality.High);
-                using var scaledImage = SKImage.FromBitmap(scaledBitmap);
-                using var data = scaledImage.Encode(SKEncodedImageFormat.Jpeg, 100);
-                using var s = File.OpenWrite(Path.Combine(destPath, imgName + ".jpg"));
-                data.SaveTo(s);
-            }));
+                    using var scaledBitmap = bitmap.Resize(
+                        new SKImageInfo(destinationWidth, destinationHeight),
+                        SKFilterQuality.High);
+                    using var scaledImage = SKImage.FromBitmap(scaledBitmap);
+                    using var data = scaledImage.Encode(SKEncodedImageFormat.Jpeg, 100);
+                    using var s = File.OpenWrite(Path.Combine(destPath, imgName + ".jpg"));
+                    data.SaveTo(s);
+                }));
+            }
 
-            await Task.WhenAll(tasks);
+            await Task.WhenAll(taskList);
         }
 
         /// <summary>
