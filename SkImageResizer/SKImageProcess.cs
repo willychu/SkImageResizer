@@ -45,8 +45,12 @@ namespace SkImageResizer
                 data.SaveTo(s);
             }
         }
+        public Task ResizeImagesAsync(string sourcePath, string destPath, double scale)
+        {
+            return ResizeImagesAsync(sourcePath, destPath, scale, CancellationToken.None);
+        }
 
-        public async Task ResizeImagesAsync(string sourcePath, string destPath, double scale)
+        public async Task ResizeImagesAsync(string sourcePath, string destPath, double scale, CancellationToken token)
         {
             if (!Directory.Exists(destPath))
             {
@@ -72,6 +76,8 @@ namespace SkImageResizer
                     var destinationWidth = (int) (sourceWidth * scale);
                     var destinationHeight = (int) (sourceHeight * scale);
 
+                    token.ThrowIfCancellationRequested();
+
                     using var scaledBitmap = bitmap.Resize(
                         new SKImageInfo(destinationWidth, destinationHeight),
                         SKFilterQuality.High);
@@ -79,10 +85,33 @@ namespace SkImageResizer
                     using var data = scaledImage.Encode(SKEncodedImageFormat.Jpeg, 100);
                     using var s = File.OpenWrite(Path.Combine(destPath, imgName + ".jpg"));
                     data.SaveTo(s);
-                }));
+                }, token));
             }
 
-            await Task.WhenAll(taskList);
+            try
+            {
+                await Task.WhenAll(taskList);
+            }
+            catch (Exception)
+            {
+                foreach (var task in taskList)
+                {
+                    switch (task.Status)
+                    {
+                        case TaskStatus.RanToCompletion:
+                            Console.WriteLine($"Task Id: {task.Id} Complete");
+                            break;
+                        case TaskStatus.Canceled:
+                            Console.WriteLine($"Task Id: {task.Id} Canceled");
+                            break;
+                        case TaskStatus.Faulted:
+                            Console.WriteLine($"Task Id: {task.Id} Faulted");
+                            break;
+                        default:
+                            throw new ArgumentOutOfRangeException();
+                    }
+                }
+            }
         }
 
         /// <summary>
